@@ -1,0 +1,182 @@
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using AllTrailsAdmin.Models;
+using AllTrailsAdmin.Services;
+
+public class TrailsController : Controller
+{
+    private readonly AllTrailsAdminContext _context;
+    private readonly AzureStorageServies _blobService;
+
+    public TrailsController(AllTrailsAdminContext context, AzureStorageServies blobService)
+    {
+        _context = context;
+        _blobService = blobService;
+    }
+
+    // GET: TRAILS
+    public async Task<IActionResult> Index()    
+    {   
+        return View(await _context.Trail.OrderBy(m => m.CreatedDate).ToListAsync());
+    }
+
+    // GET: TRAILS/Details/5
+    public async Task<IActionResult> Details(int? id)
+    {
+        if (id == null)
+        {
+            return NotFound();
+        }
+
+        var trail = await _context.Trail.FirstOrDefaultAsync(m => m.Id == id);
+
+        if (trail == null)
+        {
+            return NotFound();
+        }
+
+        return View(trail);
+    }
+
+    // GET: TRAILS/Create
+    public IActionResult Create()
+    {
+        return View();
+    }
+
+    /*
+     * TO-DO: Handle image being required
+     * 
+     */
+
+    // POST: TRAILS/Create
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create([Bind("Id,Title,Description,Length,ElevationGain,Location,CreatedDate")] Trail trail, IFormFile? imageFile)// collect inputs and file input from form
+    {
+
+        //?Validate if image file is uploaded
+        if (imageFile == null)
+        {
+            // Manully add a validation failure
+            ModelState.AddModelError("ImageFile", "The image file upload is required.");
+
+        }
+        // Check if the model state is valid before adding the trail to the database
+        if (ModelState.IsValid)
+        {
+            // Save file in Azure Storage
+
+            //TO-DO: we need unique file names so they don't get overwritten. Usa a GUID.jpg
+            //imageFile! 
+            //Use a unique file name so file 
+            var extension = Path.GetExtension(imageFile!.FileName);
+            var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+
+
+            string imageUrl = await _blobService.UploadFileAsync(imageFile, uniqueFileName); // use the original filename
+            // Save image Url in Trail record
+            trail.ImageUrl = imageUrl;
+
+            // Save record in database
+            _context.Add(trail);
+            await _context.SaveChangesAsync();
+
+            // Redirect to the Index action after successfully create
+            return RedirectToAction(nameof(Index));
+        }
+        return View(trail);
+    }
+
+    // GET: TRAILS/Edit/5
+    public async Task<IActionResult> Edit(int? id)
+    {
+        if (id == null)
+        {
+            return NotFound();
+        }
+
+        var trail = await _context.Trail.FindAsync(id);
+        if (trail == null)
+        {
+            return NotFound();
+        }
+        return View(trail);
+    }
+
+    // POST: TRAILS/Edit/5
+    // To protect from overposting attacks, enable the specific properties you want to bind to.
+    // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(int? id, [Bind("Id,Title,Description,Length,ElevationGain,Location,CreatedDate,ImageUrl")] Trail trail)
+    {
+        if (id != trail.Id)
+        {
+            return NotFound();
+        }
+
+        if (ModelState.IsValid)
+        {
+            try
+            {
+                _context.Update(trail);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!TrailExists(trail.Id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+            return RedirectToAction(nameof(Index));
+        }
+        return View(trail);
+    }
+
+    // GET: TRAILS/Delete/5
+    public async Task<IActionResult> Delete(int? id)
+    {
+        if (id == null)
+        {
+            return NotFound();
+        }
+
+        var trail = await _context.Trail
+            .FirstOrDefaultAsync(m => m.Id == id);
+        if (trail == null)
+        {
+            return NotFound();
+        }
+
+        return View(trail);
+    }
+
+    // POST: TRAILS/Delete/5
+    [HttpPost, ActionName("Delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteConfirmed(int? id)
+    {
+        var trail = await _context.Trail.FindAsync(id);
+        if (trail != null)
+        {
+            _context.Trail.Remove(trail);
+        }
+
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
+
+    private bool TrailExists(int? id)
+    {
+        return _context.Trail.Any(e => e.Id == id);
+    }
+}
