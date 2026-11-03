@@ -23,12 +23,13 @@ public class TrailsController : Controller
     public async Task<IActionResult> Index()    
     {
         //Log the currently logged in user
-       var user = User.GetUserId();
-        if (user != null)
-        {
-            Console.WriteLine("Logged in user:" + user);
-        }
+       //var user = User.GetUserId();
+       // if (user != null)
+       // {
+       //     Console.WriteLine("Logged in user:" + user);
+       // }
 
+        // Retrieve all trails from the database
         List<Trail> Trails = await _context.Trail
             .Include(m => m.Category)
             .ToListAsync();
